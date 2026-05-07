@@ -1,245 +1,92 @@
 ---
-title: "Decision Advocacy Challenge"
-subtitle: "Data-Driven Scheduling for Maximum Productivity"
+title: "The Boss Effect"
+subtitle: "What 250 Days of Data Tell Patrick About His Most Valuable Asset : His Time"
+author: "Salman Ahmad Shah Khagga"
 format:
-  html: default
+  html:
+    theme: flatly
+    toc: true
+    toc-title: "Jump To"
+    toc-depth: 2
+    embed-resources: true
+    page-layout: full
 execute:
-  echo: true
-  eval: true
+  echo: false
+  warning: false
+  message: false
+---
+{python} import pandas as pd import numpy as np import matplotlib.pyplot as plt from matplotlib.patches import FancyBboxPatch from scipy import stats np.random.seed(42) carsDF = pd.read_csv("carsFixed.csv") C_BOSS = "#F4A261" C_NO = "#264653" C_ACCENT = "#E9C46A" plt.rcParams.update({ "font.family": "DejaVu Sans", "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.alpha": 0.3, "grid.linestyle": "--" }) summary = ( carsDF .groupby(["shopID", "boss"])["carsFixed"] .agg(n="count", mean="mean", std="std") .reset_index() ) summary["se"] = summary["std"] / np.sqrt(summary["n"]) summary["ci95"] = 1.96 * summary["se"] pres = summary[summary["boss"] == 1].set_index("shopID") abse = summary[summary["boss"] == 0].set_index("shopID") shops = [1, 2, 3, 4, 5] lift = {s: round(pres.loc[s, "mean"] - abse.loc[s, "mean"], 2) for s in shops} lift_s = sorted(lift.items(), key=lambda x: x[1], reverse=True) REVENUE_PER_CAR = 150 SHOP_DAYS = 50
 ---
 
-# 🔧 Decision Advocacy Challenge - Patrick's Auto Shop Analysis
+## One Question Worth Answering
 
-## Challenge Overview
+Patrick runs 5 shops and can only be at one place per day. So which shop actually needs him there?
 
-**Your Mission:** Create a concise, punchy Quarto document (aim for 1-5 printed pages) that analyzes historical productivity data from Patrick's auto shop network. Your report should give Patrick clear, actionable recommendations he can understand and use. Write it so an auto-mechanic can follow it—no jargon, no confusion, no boredom. Then render the document to HTML and deploy it via GitHub Pages.
+I looked at 250 days of records — cars fixed, which shop, and whether Patrick was present. The charts below show what I found. I kept it simple: what the numbers say, how confident we should be, and what Patrick should probably do next.
 
-**Key Requirements:**
+---
 
-- **Simplicity:** Patrick is an auto-mechanic, not a statistician. Write so he can understand.
-- **Conciseness:** 1-5 printed pages. Get to the point.
-- **Beautiful visualizations:** Show all 250 data points clearly.
-- **Logical recommendations:** Defensible advice based on the data.
-- **Confidence assessment:** Explain uncertainty in plain terms. We only have 250 days of data—that's not a lot. Help Patrick understand what ranges of differences he can expect.
+## At a Glance — The Boss Effect by Shop
+{python} #| fig-cap: "Average extra cars fixed per day when Patrick shows up. Orange = worth prioritizing. Gold = decent boost. Teal = little change." fig, axes = plt.subplots(1, 5, figsize=(13, 2.8)) fig.patch.set_facecolor("#f8f9fa") for i, shop in enumerate(shops): ax = axes[i] ax.set_facecolor("#f8f9fa") l = lift[shop] col = C_BOSS if l >= 8 else (C_ACCENT if l >= 5 else C_NO) ax.text(0.5, 0.82, f"SHOP {shop}", ha="center", va="center", fontsize=13, fontweight="bold", color="#264653", transform=ax.transAxes) ax.text(0.5, 0.50, f"+{l:.1f}", ha="center", va="center", fontsize=26, fontweight="bold", color=col, transform=ax.transAxes) ax.text(0.5, 0.18, "extra cars/day\nwhen boss visits", ha="center", va="center", fontsize=8, color="#6c757d", transform=ax.transAxes) rect = FancyBboxPatch( (0.05, 0.05), 0.90, 0.90, boxstyle="round,pad=0.02", linewidth=2, edgecolor=col, facecolor="white", transform=ax.transAxes, clip_on=False ) ax.add_patch(rect) ax.axis("off") fig.suptitle("Extra Cars Fixed Per Day When Patrick Visits — by Shop", fontsize=12, fontweight="bold", y=1.05, color="#264653") plt.tight_layout() plt.show()
+Each number is the average gap between days Patrick showed up and days he did not. Bigger number means his visit made more of a difference at that shop.
 
-## The Business Problem 🎯
+---
 
-Patrick runs a network of 5 auto repair shops. He's been tracking productivity data (number of cars fixed per day) across all shops, along with whether he (the boss) was present at each shop on each day. 
+## All 250 Days — Every Dot Is One Real Day
 
-**The Core Question:** When and where should Patrick schedule his presence to maximize productivity and revenue?
+Orange dots are days Patrick was there. Teal dots are days he was not. The horizontal lines are the averages. The shaded area behind each line shows how much those averages could reasonably shift.
+{python} #| fig-cap: "Figure 1: Every observation in the dataset. One dot per shop per day." fig, axes = plt.subplots(1, 5, figsize=(15, 5), sharey=False) fig.patch.set_facecolor("white") for i, shop in enumerate(shops): ax = axes[i] subset = carsDF[carsDF["shopID"] == shop] ab = subset[subset["boss"] == 0]["carsFixed"] pr = subset[subset["boss"] == 1]["carsFixed"] jitter_ab = np.random.uniform(-0.18, 0.18, len(ab)) jitter_pr = np.random.uniform(-0.18, 0.18, len(pr)) ax.scatter(np.zeros(len(ab)) + jitter_ab, ab, color=C_NO, alpha=0.50, s=35, label="Boss Away", zorder=2) ax.scatter(np.ones(len(pr)) + jitter_pr, pr, color=C_BOSS, alpha=0.70, s=45, label="Boss Here", zorder=3) ax.axhspan(ab.mean() - ab.std()/np.sqrt(len(ab)), ab.mean() + ab.std()/np.sqrt(len(ab)), xmin=0.0, xmax=0.45, alpha=0.2, color=C_NO) ax.axhspan(pr.mean() - pr.std()/np.sqrt(len(pr)), pr.mean() + pr.std()/np.sqrt(len(pr)), xmin=0.55, xmax=1.0, alpha=0.2, color=C_BOSS) ax.hlines(ab.mean(), -0.35, 0.35, colors=C_NO, linewidths=2.5, zorder=4) ax.hlines(pr.mean(), 0.65, 1.35, colors=C_BOSS, linewidths=2.5, zorder=4) ax.annotate("", xy=(1.0, pr.mean()), xytext=(0.0, ab.mean()), arrowprops=dict(arrowstyle="<->", color="#e76f51", lw=1.8)) ax.text(1.55, (pr.mean() + ab.mean()) / 2, f"Gap {lift[shop]:+.1f}", va="center", color="#e76f51", fontweight="bold", fontsize=11) ax.set_title(f"Shop {shop}", fontsize=13, fontweight="bold", pad=8) ax.set_xticks([0, 1]) ax.set_xticklabels(["Boss Away", "Boss Here"], fontsize=10) ax.set_ylabel("Cars Fixed That Day", fontsize=9) ax.set_xlim(-0.6, 2.1) ax.spines[["top", "right"]].set_visible(False) if i == 0: ax.legend(loc="upper left", fontsize=8, framealpha=0.7) fig.suptitle("Cars Fixed Each Day — Boss Present vs Not Present", fontsize=14, fontweight="bold", y=1.02) plt.tight_layout() plt.show()
+Shop 4 has the biggest visible gap — orange dots are clearly higher than teal. Shop 2 shows a similar pattern. Shop 3 is the flattest of all five, meaning Patrick's presence there barely shifted output. His brother's crew seems to handle things fine on their own.
 
-**Key Considerations:**
+---
 
-- Patrick can only be at one shop per day
-- Different shops may respond differently to his presence
-- Revenue depends on number of cars fixed (assume a fixed price per car)
-- Historical patterns may not predict future performance perfectly
-- Patrick loves visiting his brother who runs Shop 3
+## Which Shop Gets the Most Out of a Visit?
+{python} #| fig-cap: "Figure 2: Boss effect ranked. Higher bar means Patrick's presence moved the needle more at that shop." fig, ax = plt.subplots(figsize=(9, 5)) sorted_shops = [s for s, _ in lift_s] sorted_lifts = [l for _, l in lift_s] bar_colors = [C_BOSS if l >= 8 else (C_ACCENT if l >= 5 else C_NO) for l in sorted_lifts] bars = ax.barh( [f"Shop {s}" for s in sorted_shops][::-1], sorted_lifts[::-1], color=bar_colors[::-1], height=0.55, edgecolor="white", linewidth=0.8 ) for bar, val in zip(bars, sorted_lifts[::-1]): ax.text(val + 0.25, bar.get_y() + bar.get_height() / 2, f"+{val:.1f} cars/day", va="center", fontweight="bold", fontsize=11, color="#264653") ax.set_xlabel("Average Extra Cars Fixed When Boss Is Present", fontsize=10) ax.set_title("Boss Effect Ranked by Shop", fontsize=12, fontweight="bold") ax.set_xlim(0, max(sorted_lifts) + 6) ax.axvline(8, color=C_BOSS, linewidth=1.2, linestyle=":", alpha=0.7) ax.text(8.15, -0.55, "High-Impact Threshold", color=C_BOSS, fontsize=8) plt.tight_layout() plt.show()
+{python} rows = [] for shop in shops: p = pres.loc[shop] a = abse.loc[shop] l = lift[shop] p_data = carsDF[(carsDF["shopID"] == shop) & (carsDF["boss"] == 1)]["carsFixed"] a_data = carsDF[(carsDF["shopID"] == shop) & (carsDF["boss"] == 0)]["carsFixed"] se_d = np.sqrt(p_data.var()/len(p_data) + a_data.var()/len(a_data)) df_w = (p_data.var()/len(p_data) + a_data.var()/len(a_data))**2 / \ ((p_data.var()/len(p_data))**2 / (len(p_data) - 1) + (a_data.var()/len(a_data))**2 / (len(a_data) - 1)) ci = stats.t.ppf(0.975, df=df_w) * se_d tier = "High" if l >= 8 else ("Medium" if l >= 5 else "Low") rows.append({ "Shop" : f"Shop {shop}", "Days Away / Here" : f"{int(a['n'])} / {int(p['n'])}", "Avg Without Patrick" : f"{a['mean']:.1f} cars", "Avg With Patrick" : f"{p['mean']:.1f} cars", "Boss Effect" : f"+{l:.1f} cars/day", "Realistic Range" : f"+{max(0, l - ci):.1f} to +{l + ci:.1f}", "Priority" : tier, }) tbl = pd.DataFrame(rows) tbl.index = [""] * len(tbl) tbl
+The "Realistic Range" column matters. It shows what the boost could reasonably be — not just the average, but the range you'd expect if this played out over more days. Shop 4 has a wide range partly because Patrick only visited 5 times in the whole dataset, so there is less to go on there.
 
-::: {.callout-important}
-## 🎯 The Key Insight: Data-Driven Decision Making
+---
 
-**The problem:** Patrick needs to make scheduling decisions based on data, not intuition. He needs to understand:
+## What Is a Visit Actually Worth in Revenue?
 
-- Which shops benefit most from his presence?
-- Are there patterns by shop that suggest different strategies?
-- What are the revenue and profit implications of different scheduling scenarios?
-- How confident can he be in these recommendations?
+Assuming $150 per car fixed:
+{python} rev_rows = [] for shop in shops: l = lift[shop] annual_rev = l * REVENUE_PER_CAR * SHOP_DAYS rev_rows.append({ "Shop" : f"Shop {shop}", "Boss Effect" : f"+{l:.1f} cars/day", "Extra Revenue Per Visit Day" : f"${l * REVENUE_PER_CAR:,.0f}", "Extra Revenue/Year (50 visit-days)" : f"${annual_rev:,.0f}", "Priority" : "High" if l >= 8 else ("Medium" if l >= 5 else "Low"), }) rev_df = pd.DataFrame(rev_rows) rev_df.index = [""] * len(rev_df) rev_df
+A visit to Shop 4 on a typical day adds around $1,900 in output compared to Patrick not being there. That is not from hiring anyone new or buying equipment — just from showing up at the right place.
 
-**Why this matters:** Poor scheduling decisions can lead to:
+---
 
-- Wasted time (Patrick at shops that don't need him)
-- Lost revenue (shops that need him but don't get him)
+## Three Ways Patrick Could Schedule His Time
 
-**The connection:** This is a real-world decision problem where data analysis can directly impact business outcomes. Your job is to make the data tell a clear, actionable story.
-:::
+This uses 50 visit-days per year across all shops and projects what total output looks like under each approach.
+{python} #| fig-cap: "Figure 3: Projected annual output under three scheduling choices." scenario_defs = { "Current\n(Spread Thin)" : {1: 10, 2: 10, 3: 10, 4: 10, 5: 10}, "Smart Focus\n(Top Shops)" : {1: 5, 2: 15, 3: 0, 4: 20, 5: 10}, "All-In on Shop 4\n(Extreme)" : {1: 0, 2: 0, 3: 0, 4: 50, 5: 0}, } totals = {} breakdowns = {} for name, sched in scenario_defs.items(): total = 0 bd = {} for s in shops: boss_d = sched[s] away_d = SHOP_DAYS - boss_d contrib = boss_d * pres.loc[s, "mean"] + away_d * abse.loc[s, "mean"] total += contrib bd[s] = contrib totals[name] = total breakdowns[name] = bd labels = list(scenario_defs.keys()) vals = [totals[lbl] for lbl in labels] colors_s = [C_NO, C_BOSS, C_ACCENT] fig, (ax1, ax2) = plt.subplots( 1, 2, figsize=(13, 5), gridspec_kw={"width_ratios": [1.4, 1]} ) bars = ax1.bar(labels, vals, color=colors_s, width=0.45, edgecolor="white") for bar, val in zip(bars, vals): rev_label = f"~${val * REVENUE_PER_CAR / 1000:.0f}k revenue" ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 25, f"{int(val):,} cars\n{rev_label}", ha="center", fontweight="bold", fontsize=9) baseline = vals[0] for bar, val in zip(bars[1:], vals[1:]): diff = val - baseline rev_diff = diff * REVENUE_PER_CAR ax1.annotate(f"+{int(diff):,} cars vs current\n+${rev_diff:,.0f}/yr", xy=(bar.get_x() + bar.get_width() / 2, val + 200), ha="center", fontsize=9, color="#e76f51", fontweight="bold") ax1.set_title("Projected Annual Output by Scheduling Strategy", fontweight="bold", fontsize=12) ax1.set_ylabel("Estimated Cars Fixed Per Year") ax1.set_ylim(0, max(vals) * 1.22) ax1.spines[["top","right"]].set_visible(False) bottom = np.zeros(3) shop_colors = ["#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"] for j, shop in enumerate(shops): heights = [breakdowns[lbl][shop] for lbl in labels] ax2.bar(labels, heights, bottom=bottom, color=shop_colors[j], label=f"Shop {shop}", edgecolor="white", width=0.45) bottom += np.array(heights) ax2.set_title("Which Shop Contributes What\n(Stacked)", fontweight="bold", fontsize=12) ax2.set_ylabel("Cars Fixed Per Year") ax2.legend(loc="upper right", fontsize=8) ax2.spines[["top","right"]].set_visible(False) plt.tight_layout() plt.show()
+Shifting visits toward the higher-impact shops adds more than 100 extra cars per year compared to spreading time equally — same number of days, just better choices about where to go.
 
-## The Data 📊
+---
 
-The dataset contains 250 observations of daily productivity across 5 shops:
+## How Much Should Patrick Trust These Numbers?
+{python} #| fig-cap: "Figure 4: The dot is the best estimate. The thick bar shows the realistic range at 95% confidence." fig, ax = plt.subplots(figsize=(9, 5)) lifts_mean = [] lifts_ci_vals = [] for shop in shops: p_d = carsDF[(carsDF["shopID"] == shop) & (carsDF["boss"] == 1)]["carsFixed"] a_d = carsDF[(carsDF["shopID"] == shop) & (carsDF["boss"] == 0)]["carsFixed"] md = p_d.mean() - a_d.mean() se = np.sqrt(p_d.var()/len(p_d) + a_d.var()/len(a_d)) dfw = (p_d.var()/len(p_d) + a_d.var()/len(a_d))**2 / \ ((p_d.var()/len(p_d))**2 / (len(p_d) - 1) + (a_d.var()/len(a_d))**2 / (len(a_d) - 1)) ci = stats.t.ppf(0.975, df=dfw) * se lifts_mean.append(md) lifts_ci_vals.append(ci) dot_colors = [C_BOSS if m >= 8 else (C_ACCENT if m >= 5 else C_NO) for m in lifts_mean] for i, (m, ci, col) in enumerate(zip(lifts_mean, lifts_ci_vals, dot_colors)): ax.plot([m - ci, m + ci], [i, i], color=col, linewidth=5, alpha=0.45, solid_capstyle="round") ax.scatter(m, i, color=col, s=130, zorder=5, edgecolors="white", linewidth=1.5) ax.text(m + ci + 0.4, i, f"Best guess: +{m:.1f} (range: +{max(0, m - ci):.1f} to +{m + ci:.1f})", va="center", fontsize=9, color="#264653") ax.axvline(0, color="black", linewidth=1) ax.set_yticks(range(len(shops))) ax.set_yticklabels([f"Shop {s}" for s in shops], fontsize=11, fontweight="bold") ax.set_xlabel("Extra Cars Fixed Per Day: Boss Present vs Not Present", fontsize=10) ax.set_title("Best Estimate vs Realistic Range for Each Shop", fontsize=12, fontweight="bold") ax.set_xlim(-3, max(lifts_mean) + 12) ax.spines[["top","right"]].set_visible(False) plt.tight_layout() plt.show()
+250 days sounds like a lot but once it is split across 5 shops it thins out fast. Patrick was only present at Shop 4 on 5 of those days — that is not much to build a firm conclusion on. The direction looks right but the exact numbers have wiggle room.
 
-```{python}
-#| echo: false
-#| include: false
-import pandas as pd
+A few things that could make these estimates off:
 
-# Load the data
-carsDF = pd.read_csv("carsFixed.csv")
-```
+- Patrick may have visited certain shops on days that were already going to be busier than normal, which would inflate the apparent boost.
+- The data does not capture seasonal swings, staff turnover, or equipment issues — all of which affect daily output.
+- Six more months of data would tighten these ranges noticeably.
 
-```{python}
-#| label: tbl-data-overview
-#| tbl-cap: "Overview of the productivity data"
-#| echo: true
-carsDF.head(10)
-```
+The overall pattern holds up though. Shops 4 and 2 show a real gap. Shop 3 does not.
 
-**Data Dictionary:**
+---
 
-- `observation`: Observation number (1-250)
-- `shopID`: Shop identifier (1-5)
-- `boss`: Binary indicator (0 = boss absent, 1 = boss present)
-- `carsFixed`: Number of cars fixed that day
+## What Should Patrick Actually Do?
+{python} fig, ax = plt.subplots(figsize=(12, 3.8)) ax.axis("off") action_data = [ ["Shop 4", f"+{lift[4]:.1f} cars/day", "Visit most often", "Biggest gap in the data — highest return on his time"], ["Shop 2", f"+{lift[2]:.1f} cars/day", "Regular weekly visits", "Consistent boost, good sample of days to back it up"], ["Shop 5", f"+{lift[5]:.1f} cars/day", "Check in regularly", "High output shop that still gets a lift when he shows up"], ["Shop 1", f"+{lift[1]:.1f} cars/day", "Visit occasionally", "Smaller boost but still worth a stop now and then"], ["Shop 3", f"+{lift[3]:.1f} cars/day", "Visit less for productivity", "Runs well on its own — go for family, not for the numbers"], ] col_labels = ["Shop", "Boss Effect", "Suggested Frequency", "Reasoning"] tbl_obj = ax.table( cellText=action_data, colLabels=col_labels, cellLoc="center", loc="center", bbox=[0, 0, 1, 1] ) tbl_obj.auto_set_font_size(False) tbl_obj.set_fontsize(9.5) for j in range(4): tbl_obj[(0, j)].set_facecolor("#264653") tbl_obj[(0, j)].set_text_props(color="white", fontweight="bold") row_colors = ["#fff3e0", "#fff3e0", "#fffde7", "#fffde7", "#e8f5e9"] for i, color in enumerate(row_colors, 1): for j in range(4): tbl_obj[(i, j)].set_facecolor(color) ax.set_title("Recommended Schedule Based on the Data", fontsize=13, fontweight="bold", pad=15) plt.tight_layout() plt.show()
+---
 
-```{python}
-#| label: tbl-data-summary
-#| tbl-cap: "Summary statistics by shop and boss presence"
-#| echo: true
-summary = carsDF.groupby(['shopID', 'boss'])['carsFixed'].agg(['count', 'mean', 'std', 'min', 'max']).round(2)
-summary
-```
+## To Wrap Up
 
-## Challenge Requirements 📋
+The data points toward a pretty clear answer. Shops 4 and 2 respond the most to Patrick being there. Shop 3 barely moves either way — his brother's team handles things well without him.
 
-### Minimum Requirements for Any Points on Challenge
+Smarter scheduling does not mean working more days. It just means choosing better where to show up. Based on this dataset, that shift alone could add over 100 cars per year across the network.
 
-1. **Create a Quarto Document:** Write a comprehensive quarto markdown file structured as a professional business report. Your final rendered HTML should be a polished, client-ready document that Patrick can use to make decisions. **Important:** Your final rendered HTML should contain only your analysis and recommendations—all challenge instructions, setup guides, and grading rubrics should be removed from the final report.
+One thing worth doing: keep tracking. Another few months of data — especially more days with Patrick present at Shop 4 — would make these estimates much more reliable.
 
-2. **Render to HTML:** You must render the quarto markdown file to HTML.
-
-3. **GitHub Repository:** Create a repository named `decAdvocacyChallenge` in your GitHub account. Upload your rendered HTML files to this repository.
-
-4. **GitHub Pages Setup:** The repository should be made the source of your GitHub Pages:
-   - Go to your repository settings (click the "Settings" tab in your GitHub repository)
-   - Scroll down to the "Pages" section in the left sidebar
-   - Under "Source", select "Deploy from a branch"
-   - Choose "main" branch and "/ (root)" folder
-   - Click "Save"
-   - Your site will be available at: `https://[your-username].github.io/decAdvocacyChallenge/`
-   - **Note:** It may take a few minutes for the site to become available after enabling Pages
-
-## Getting Started: Repository Setup 🚀
-
-::: {.callout-important}
-## 📁 Quick Start
-
-**Step 1:** Create a new repository named `decAdvocacyChallenge` in your GitHub account by forking the starter repository at [https://github.com/flyaflya/decAdvocacyChallenge.git](https://github.com/flyaflya/decAdvocacyChallenge.git)
-
-**Step 2:** Clone the repository locally using Cursor (or VS Code)
-
-**Step 3:** The data file `carsFixed.csv` is already included in this repository. The code will load it from the local file.
-
-**Step 4:** You're ready to start! Modify this `index.qmd` file and begin your analysis.
-:::
-
-::: {.callout-tip}
-## 💡 Why This Approach?
-
-**Benefits:**
-
-- **Real-world application:** You're solving an actual business problem
-- **Data-driven insights:** Learn to extract actionable insights from data
-- **Professional presentation:** Create a report that a real client would use
-- **Visual storytelling:** Master the art of data visualization for decision-making
-:::
-
-## Grading Rubric 🎓
-
-::: {.callout-important}
-## 📊 What You're Really Being Graded On
-
-**This is a report for Patrick, an auto-mechanic, not a statistics professor.** Your job is to give him clear, actionable advice he can understand and use. Think of this as a brief consultation report—something he can read in 5 minutes and immediately know what to do.
-
-**Report Format:**
-
-- **Conciseness:** Aim for 1-5 printed pages. Patrick is busy—get to the point quickly.
-- **Simplicity:** Write so an auto-mechanic can understand. Avoid jargon. Use plain language.
-- **Delete All Challenge Instructions:** Once you've completed your analysis, remove all challenge instructions, setup guides, and grading rubrics from your final rendered HTML. The final report should contain only your analysis, visualizations, and recommendations—nothing else.
-- **Hidden Code:** Tell a narrative and visual story, but hide your code (the code can be referenced in your github *.qmd source file if needed).
-- **Show All Data Points:** When plotting historical data, display all 250 observations (not just summaries). Use transparency, jitter, or other techniques to handle overlapping points.
-
-**What makes a great report:**
-
-- **Beautiful visualizations:** Clean, clear charts that tell the story at a glance
-- **Logical recommendations:** Defensible advice based on the data, not speculation
-- **Confidence assessment:** Explain uncertainty in plain terms. What ranges of differences can Patrick expect? How confident can he be? (Remember: we only have 250 days of data—that's not a lot.)
-- **Punchy and focused:** Don't bore Patrick with unnecessary analysis. Focus on what matters for his decision.
-
-**What we're looking for:** A report Patrick can read, understand, and act on. If he's confused or bored, you've missed the mark.
-:::
-
-### What Your Report Should Include
-
-Your report should answer these questions in a clear, concise way:
-
-1. **What does the data show?**
-
-   - Visualize all 250 data points showing productivity by shop and boss presence
-   - Which shops benefit most from Patrick's presence? Which don't?
-
-2. **What should Patrick do?**
-
-   - Clear, specific recommendations: Which shops should he prioritize? Why?
-   - What's the potential financial impact? (Revenue or profit implications)
-
-3. **How confident can Patrick be?**
-
-   - Explain uncertainty in plain terms an auto-mechanic can understand
-   - What ranges of differences can he expect? (We only have 250 days—that's not a huge sample)
-   - What could go wrong? What assumptions are you making?
-
-4. **What does the future look like?**
-
-   - Show at least one visualization of projected outcomes under different scheduling scenarios
-   - Help Patrick see the potential impact of following your recommendations
-
-**Remember:** Less is more. A focused, punchy report that Patrick can understand and act on is better than a long, complex analysis that confuses him.
-
-## Technical Implementation Preferences 💡
-
-### Setting Up Your Analysis
-
-- Use `pandas` for data manipulation
-- Use `matplotlib` and `seaborn` for visualizations
-- Use `numpy` for numerical calculations if needed
-- Consider using `scipy` for statistical tests if helpful
-
-### Visualization Preferences
-
-- **Professional Styling:** Use consistent colors, clear labels, readable fonts, and informative titles
-- **Show All Points:** When displaying historical data, ensure all 250 observations are visible (use transparency, jitter, or other techniques)
-- **Color Coding:** Use consistent color schemes (e.g., one color for boss present, another for boss absent)
-- **Interactive Elements:** Consider using plotly for interactive visualizations if helpful (optional)
-
-### Data Loading
-
-The data file `carsFixed.csv` is included in your repository. Load it using pandas:
-
-```python
-import pandas as pd
-carsDF = pd.read_csv("carsFixed.csv")
-```
-
-## Submission Checklist ✅
-
-**Technical Requirements:**
-
-- [ ] Forked repository `decAdvocacyChallenge` from the starter repository
-- [ ] Cloned repository locally using Cursor (or VS Code)
-- [ ] Quarto document created with clear narrative (use this `index.qmd` as a starting point)
-- [ ] Document rendered to HTML successfully
-- [ ] HTML files uploaded to your repository
-- [ ] GitHub Pages enabled and working
-- [ ] Site accessible at `https://[your-username].github.io/decAdvocacyChallenge/`
-
-**Report Quality Requirements:**
-
-- [ ] **Conciseness:** Report is 1-5 printed pages (not a novel)
-- [ ] **Simplicity:** Written so an auto-mechanic can understand (no unnecessary jargon)
-- [ ] **Beautiful visualizations:** Clean, clear charts that tell the story with persuasive titles, meaningful labels, and useful annotations.
-- [ ] **All 250 data points visible:** Historical data shows all observations, not just summaries (on one of the visualizations)
-- [ ] **Logical recommendations:** Defensible advice based on the data
-- [ ] **Confidence assessment:** Uncertainty explained in plain terms Patrick can understand
-- [ ] **Future scenarios:** At least one visualization showing projected outcomes
-- [ ] **Clean final report:** All challenge instructions, setup guides, and grading rubrics removed from final HTML
-- [ ] **Hidden code:** Code is hidden in final report (must be in source .qmd file)
-
-### Resources
-
-- **Quarto Markdown:** [quarto.org/docs/authoring/markdown-basics.html](https://quarto.org/docs/authoring/markdown-basics.html)
-- **Quarto Documentation:** [quarto.org/docs](https://quarto.org/docs)
-- **Python Data Science Handbook:** [jakevdp.github.io/PythonDataScienceHandbook](https://jakevdp.github.io/PythonDataScienceHandbook)
-- **Pandas Documentation:** [pandas.pydata.org/docs](https://pandas.pydata.org/docs)
-- **Matplotlib Gallery:** [matplotlib.org/stable/gallery](https://matplotlib.org/stable/gallery)
-- **Seaborn Tutorial:** [seaborn.pydata.org/tutorial.html](https://seaborn.pydata.org/tutorial.html)
-
+---
