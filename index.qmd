@@ -10,6 +10,20 @@ format:
     toc-depth: 2
     embed-resources: true
     page-layout: full
+    include-in-header:
+      text: |
+        <style>
+        .cell-output-display img {
+          max-width: 100% !important;
+          height: auto !important;
+        }
+        .cell-output-display {
+          overflow-x: visible !important;
+        }
+        table {
+          font-size: 0.92rem;
+        }
+        </style>
 execute:
   echo: false
   warning: false
@@ -45,6 +59,7 @@ summary = (
     .agg(n="count", mean="mean", std="std")
     .reset_index()
 )
+
 summary["se"]   = summary["std"] / np.sqrt(summary["n"])
 summary["ci95"] = 1.96 * summary["se"]
 
@@ -52,18 +67,27 @@ pres  = summary[summary["boss"] == 1].set_index("shopID")
 abse  = summary[summary["boss"] == 0].set_index("shopID")
 shops = [1, 2, 3, 4, 5]
 
-lift   = {s: round(pres.loc[s, "mean"] - abse.loc[s, "mean"], 2) for s in shops}
+lift = {
+    s: round(pres.loc[s, "mean"] - abse.loc[s, "mean"], 2)
+    for s in shops
+}
+
 lift_s = sorted(lift.items(), key=lambda x: x[1], reverse=True)
 
 REVENUE_PER_CAR = 150
-DAYS_PER_SHOP   = 50
+DAYS_PER_SHOP = 50
 TOTAL_VISIT_DAYS = 50
 
 def boss_effect_ci(shop):
     p_data = carsDF[(carsDF["shopID"] == shop) & (carsDF["boss"] == 1)]["carsFixed"]
     a_data = carsDF[(carsDF["shopID"] == shop) & (carsDF["boss"] == 0)]["carsFixed"]
+
     mean_diff = p_data.mean() - a_data.mean()
-    se_diff   = np.sqrt(p_data.var(ddof=1) / len(p_data) + a_data.var(ddof=1) / len(a_data))
+    se_diff = np.sqrt(
+        p_data.var(ddof=1) / len(p_data) +
+        a_data.var(ddof=1) / len(a_data)
+    )
+
     return mean_diff, 1.96 * se_diff
 ```
 
@@ -80,36 +104,68 @@ I looked at 250 days of records — cars fixed, which shop, and whether Patrick 
 ## At a Glance — The Boss Effect by Shop
 
 ```{python}
-#| fig-cap: "Average extra cars fixed per day when Patrick shows up. Orange = worth prioritizing. Gold = decent boost. Teal = little change."
+#| fig-cap: "Average extra cars fixed per day when Patrick shows up. Orange = high impact. Gold = decent boost. Teal = little change."
+#| out-width: "100%"
 
-fig, axes = plt.subplots(1, 5, figsize=(13, 2.8))
+fig, axes = plt.subplots(2, 3, figsize=(8.5, 4.4))
+axes = axes.flatten()
 fig.patch.set_facecolor("#f8f9fa")
 
 for i, shop in enumerate(shops):
-    ax  = axes[i]
+    ax = axes[i]
     ax.set_facecolor("#f8f9fa")
-    l   = lift[shop]
+
+    l = lift[shop]
     col = C_BOSS if l >= 8 else (C_ACCENT if l >= 5 else C_NO)
 
-    ax.text(0.5, 0.82, f"SHOP {shop}",
-            ha="center", va="center", fontsize=13, fontweight="bold",
-            color="#264653", transform=ax.transAxes)
-    ax.text(0.5, 0.50, f"+{l:.1f}",
-            ha="center", va="center", fontsize=26, fontweight="bold",
-            color=col, transform=ax.transAxes)
-    ax.text(0.5, 0.18, "extra cars/day\nwhen boss visits",
-            ha="center", va="center", fontsize=8,
-            color="#6c757d", transform=ax.transAxes)
+    ax.text(
+        0.5, 0.78, f"SHOP {shop}",
+        ha="center", va="center",
+        fontsize=12, fontweight="bold",
+        color="#264653",
+        transform=ax.transAxes
+    )
 
-    rect = FancyBboxPatch((0.05, 0.05), 0.90, 0.90,
-                          boxstyle="round,pad=0.02", linewidth=2,
-                          edgecolor=col, facecolor="white",
-                          transform=ax.transAxes, clip_on=False)
+    ax.text(
+        0.5, 0.48, f"+{l:.1f}",
+        ha="center", va="center",
+        fontsize=24, fontweight="bold",
+        color=col,
+        transform=ax.transAxes
+    )
+
+    ax.text(
+        0.5, 0.18,
+        "extra cars/day\nwhen boss visits",
+        ha="center", va="center",
+        fontsize=8,
+        color="#6c757d",
+        transform=ax.transAxes
+    )
+
+    rect = FancyBboxPatch(
+        (0.06, 0.08), 0.88, 0.82,
+        boxstyle="round,pad=0.02",
+        linewidth=2,
+        edgecolor=col,
+        facecolor="white",
+        transform=ax.transAxes,
+        clip_on=False
+    )
+
     ax.add_patch(rect)
     ax.axis("off")
 
-fig.suptitle("Extra Cars Fixed Per Day When Patrick Visits — by Shop",
-             fontsize=12, fontweight="bold", y=1.05, color="#264653")
+axes[5].axis("off")
+
+fig.suptitle(
+    "Extra Cars Fixed Per Day When Patrick Visits — by Shop",
+    fontsize=13,
+    fontweight="bold",
+    y=1.02,
+    color="#264653"
+)
+
 plt.tight_layout()
 plt.show()
 ```
@@ -123,53 +179,100 @@ Each number is the average gap between days Patrick showed up and days he did no
 Orange dots are days Patrick was there. Teal dots are days he was not. The horizontal lines are the averages. The shaded area behind each line shows how much those averages could reasonably shift given the sample size.
 
 ```{python}
-#| fig-cap: "Figure 1: Every observation in the dataset. One dot per shop per day. Horizontal line = average. Shaded band = margin of error on that average."
+#| fig-cap: "Figure 1: Every observation in the dataset. One dot per shop per day."
+#| out-width: "100%"
 
-fig, axes = plt.subplots(1, 5, figsize=(15, 5), sharey=False)
+fig, axes = plt.subplots(2, 3, figsize=(9.5, 6.8), sharey=False)
+axes = axes.flatten()
 fig.patch.set_facecolor("white")
 
 for i, shop in enumerate(shops):
-    ax     = axes[i]
+    ax = axes[i]
+
     subset = carsDF[carsDF["shopID"] == shop]
-    ab     = subset[subset["boss"] == 0]["carsFixed"]
-    pr     = subset[subset["boss"] == 1]["carsFixed"]
+    ab = subset[subset["boss"] == 0]["carsFixed"]
+    pr = subset[subset["boss"] == 1]["carsFixed"]
 
     jitter_ab = np.random.uniform(-0.18, 0.18, len(ab))
     jitter_pr = np.random.uniform(-0.18, 0.18, len(pr))
 
-    ax.scatter(np.zeros(len(ab)) + jitter_ab, ab,
-               color=C_NO,   alpha=0.50, s=35, label="Boss Away", zorder=2)
-    ax.scatter(np.ones(len(pr))  + jitter_pr, pr,
-               color=C_BOSS, alpha=0.70, s=45, label="Boss Here",  zorder=3)
+    ax.scatter(
+        np.zeros(len(ab)) + jitter_ab,
+        ab,
+        color=C_NO,
+        alpha=0.50,
+        s=32,
+        label="Boss Away",
+        zorder=2
+    )
 
-    ax.axhspan(ab.mean() - ab.std() / np.sqrt(len(ab)),
-               ab.mean() + ab.std() / np.sqrt(len(ab)),
-               xmin=0.0, xmax=0.45, alpha=0.2, color=C_NO)
-    ax.axhspan(pr.mean() - pr.std() / np.sqrt(len(pr)),
-               pr.mean() + pr.std() / np.sqrt(len(pr)),
-               xmin=0.55, xmax=1.0, alpha=0.2, color=C_BOSS)
+    ax.scatter(
+        np.ones(len(pr)) + jitter_pr,
+        pr,
+        color=C_BOSS,
+        alpha=0.70,
+        s=40,
+        label="Boss Here",
+        zorder=3
+    )
 
-    ax.hlines(ab.mean(), -0.35, 0.35, colors=C_NO, linewidths=2.5, zorder=4)
-    ax.hlines(pr.mean(), 0.65, 1.35, colors=C_BOSS, linewidths=2.5, zorder=4)
+    ax.axhspan(
+        ab.mean() - ab.std() / np.sqrt(len(ab)),
+        ab.mean() + ab.std() / np.sqrt(len(ab)),
+        xmin=0.0,
+        xmax=0.45,
+        alpha=0.2,
+        color=C_NO
+    )
 
-    ax.annotate("", xy=(1.0, pr.mean()), xytext=(0.0, ab.mean()),
-                arrowprops=dict(arrowstyle="<->", color="#e76f51", lw=1.8))
-    ax.text(1.55, (pr.mean() + ab.mean()) / 2,
-            f"Gap {lift[shop]:+.1f}",
-            va="center", color="#e76f51", fontweight="bold", fontsize=11)
+    ax.axhspan(
+        pr.mean() - pr.std() / np.sqrt(len(pr)),
+        pr.mean() + pr.std() / np.sqrt(len(pr)),
+        xmin=0.55,
+        xmax=1.0,
+        alpha=0.2,
+        color=C_BOSS
+    )
 
-    ax.set_title(f"Shop {shop}", fontsize=13, fontweight="bold", pad=8)
+    ax.hlines(ab.mean(), -0.35, 0.35, colors=C_NO, linewidths=2.4, zorder=4)
+    ax.hlines(pr.mean(), 0.65, 1.35, colors=C_BOSS, linewidths=2.4, zorder=4)
+
+    ax.annotate(
+        "",
+        xy=(1.0, pr.mean()),
+        xytext=(0.0, ab.mean()),
+        arrowprops=dict(arrowstyle="<->", color="#e76f51", lw=1.7)
+    )
+
+    ax.text(
+        1.45,
+        (pr.mean() + ab.mean()) / 2,
+        f"Gap {lift[shop]:+.1f}",
+        va="center",
+        color="#e76f51",
+        fontweight="bold",
+        fontsize=10
+    )
+
+    ax.set_title(f"Shop {shop}", fontsize=12, fontweight="bold", pad=8)
     ax.set_xticks([0, 1])
-    ax.set_xticklabels(["Boss Away", "Boss Here"], fontsize=10)
+    ax.set_xticklabels(["Boss Away", "Boss Here"], fontsize=9)
     ax.set_ylabel("Cars Fixed That Day", fontsize=9)
-    ax.set_xlim(-0.6, 2.1)
+    ax.set_xlim(-0.6, 1.95)
     ax.spines[["top", "right"]].set_visible(False)
 
     if i == 0:
         ax.legend(loc="upper left", fontsize=8, framealpha=0.7)
 
-fig.suptitle("Cars Fixed Each Day — Boss Present vs Not Present",
-             fontsize=14, fontweight="bold", y=1.02)
+axes[5].axis("off")
+
+fig.suptitle(
+    "Cars Fixed Each Day — Boss Present vs Not Present",
+    fontsize=14,
+    fontweight="bold",
+    y=1.01
+)
+
 plt.tight_layout()
 plt.show()
 ```
@@ -182,34 +285,51 @@ Shop 4 has the biggest visible gap — orange dots are clearly higher than teal.
 
 ```{python}
 #| fig-cap: "Figure 2: Boss effect ranked. Higher bar means Patrick's presence moved the needle more at that shop."
+#| out-width: "100%"
 
-fig, ax = plt.subplots(figsize=(9, 5))
+fig, ax = plt.subplots(figsize=(8.5, 4.8))
 
 sorted_shops = [s for s, _ in lift_s]
 sorted_lifts = [l for _, l in lift_s]
-bar_colors   = [C_BOSS if l >= 8 else (C_ACCENT if l >= 5 else C_NO) for l in sorted_lifts]
 
-bars = ax.barh([f"Shop {s}" for s in sorted_shops][::-1],
-               sorted_lifts[::-1],
-               color=bar_colors[::-1],
-               height=0.55, edgecolor="white", linewidth=0.8)
+bar_colors = [
+    C_BOSS if l >= 8 else (C_ACCENT if l >= 5 else C_NO)
+    for l in sorted_lifts
+]
+
+bars = ax.barh(
+    [f"Shop {s}" for s in sorted_shops][::-1],
+    sorted_lifts[::-1],
+    color=bar_colors[::-1],
+    height=0.55,
+    edgecolor="white",
+    linewidth=0.8
+)
 
 for bar, val in zip(bars, sorted_lifts[::-1]):
-    ax.text(val + 0.25, bar.get_y() + bar.get_height() / 2,
-            f"+{val:.1f} cars/day",
-            va="center", fontweight="bold", fontsize=11, color="#264653")
+    ax.text(
+        val + 0.25,
+        bar.get_y() + bar.get_height() / 2,
+        f"+{val:.1f} cars/day",
+        va="center",
+        fontweight="bold",
+        fontsize=10.5,
+        color="#264653"
+    )
 
 ax.set_xlabel("Average Extra Cars Fixed When Boss Is Present", fontsize=10)
 ax.set_title("Boss Effect Ranked by Shop", fontsize=12, fontweight="bold")
-ax.set_xlim(0, max(sorted_lifts) + 6)
+ax.set_xlim(0, max(sorted_lifts) + 5)
 ax.axvline(8, color=C_BOSS, linewidth=1.2, linestyle=":", alpha=0.7)
 ax.text(8.15, -0.55, "High-Impact Threshold", color=C_BOSS, fontsize=8)
+
 plt.tight_layout()
 plt.show()
 ```
 
 ```{python}
 rows = []
+
 for shop in shops:
     p = pres.loc[shop]
     a = abse.loc[shop]
@@ -218,13 +338,13 @@ for shop in shops:
     tier = "High" if l >= 8 else ("Medium" if l >= 5 else "Low")
 
     rows.append({
-        "Shop"                : f"Shop {shop}",
-        "Days Away / Here"    : f"{int(a['n'])} / {int(p['n'])}",
-        "Avg Without Patrick" : f"{a['mean']:.1f} cars",
-        "Avg With Patrick"    : f"{p['mean']:.1f} cars",
-        "Boss Effect"         : f"+{l:.1f} cars/day",
-        "Realistic Range"     : f"{mean_diff - ci:+.1f} to {mean_diff + ci:+.1f}",
-        "Priority"            : tier
+        "Shop": f"Shop {shop}",
+        "Days Away / Here": f"{int(a['n'])} / {int(p['n'])}",
+        "Avg Without Patrick": f"{a['mean']:.1f}",
+        "Avg With Patrick": f"{p['mean']:.1f}",
+        "Boss Effect": f"+{l:.1f}",
+        "Realistic Range": f"{mean_diff - ci:+.1f} to {mean_diff + ci:+.1f}",
+        "Priority": tier
     })
 
 tbl = pd.DataFrame(rows)
@@ -238,20 +358,21 @@ The "Realistic Range" column matters. It shows what the boost could reasonably b
 
 ## What Is a Visit Actually Worth in Revenue?
 
-Assuming **$150 per car fixed**:
+Assuming **\$150 per car fixed**:
 
 ```{python}
 rev_rows = []
+
 for shop in shops:
     l = lift[shop]
     annual_rev = l * REVENUE_PER_CAR * TOTAL_VISIT_DAYS
 
     rev_rows.append({
-        "Shop"                               : f"Shop {shop}",
-        "Boss Effect"                        : f"+{l:.1f} cars/day",
-        "Extra Revenue Per Visit"            : f"${l * REVENUE_PER_CAR:,.0f}",
-        "Extra Revenue/Year (50 visit-days)" : f"${annual_rev:,.0f}",
-        "Priority"                           : "High" if l >= 8 else ("Medium" if l >= 5 else "Low")
+        "Shop": f"Shop {shop}",
+        "Boss Effect": f"+{l:.1f}",
+        "Revenue Per Visit": f"${l * REVENUE_PER_CAR:,.0f}",
+        "Revenue if 50 Visits": f"${annual_rev:,.0f}",
+        "Priority": "High" if l >= 8 else ("Medium" if l >= 5 else "Low")
     })
 
 rev_df = pd.DataFrame(rev_rows)
@@ -259,7 +380,7 @@ rev_df.index = [""] * len(rev_df)
 rev_df
 ```
 
-A visit to Shop 4 on a typical day adds around **$1,900 in output** compared to Patrick not being there. That is not from hiring anyone new or buying equipment — just from showing up at the right place.
+A visit to Shop 4 on a typical day adds around **\$1,900 in output** compared to Patrick not being there. That is not from hiring anyone new or buying equipment — just from showing up at the right place.
 
 ---
 
@@ -269,72 +390,58 @@ This uses 50 total Patrick visit-days per year across all shops and projects wha
 
 ```{python}
 #| fig-cap: "Figure 3: Projected annual output under three scheduling choices. Same number of days — different choices about where to go."
+#| out-width: "100%"
 
 scenario_defs = {
-    "Current\n(Spread Thin)"      : {1: 10, 2: 10, 3: 10, 4: 10, 5: 10},
-    "Smart Focus\n(Top Shops)"    : {1:  5, 2: 15, 3:  0, 4: 20, 5: 10},
-    "All-In on Shop 4\n(Extreme)" : {1:  0, 2:  0, 3:  0, 4: 50, 5:  0}
+    "Current\nSpread Thin": {1: 10, 2: 10, 3: 10, 4: 10, 5: 10},
+    "Smart Focus\nTop Shops": {1: 5, 2: 15, 3: 0, 4: 20, 5: 10},
+    "All-In\nShop 4": {1: 0, 2: 0, 3: 0, 4: 50, 5: 0}
 }
 
-totals     = {}
-breakdowns = {}
+totals = {}
 
 for name, sched in scenario_defs.items():
     total = 0
-    bd    = {}
 
     for s in shops:
-        boss_d  = sched[s]
-        away_d  = DAYS_PER_SHOP - boss_d
+        boss_d = sched[s]
+        away_d = DAYS_PER_SHOP - boss_d
         contrib = boss_d * pres.loc[s, "mean"] + away_d * abse.loc[s, "mean"]
-        total  += contrib
-        bd[s]   = contrib
+        total += contrib
 
-    totals[name]     = total
-    breakdowns[name] = bd
+    totals[name] = total
 
-labels   = list(scenario_defs.keys())
-vals     = [totals[lbl] for lbl in labels]
+labels = list(scenario_defs.keys())
+vals = [totals[lbl] for lbl in labels]
 colors_s = [C_NO, C_BOSS, C_ACCENT]
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5),
-                                gridspec_kw={"width_ratios": [1.4, 1]})
+fig, ax = plt.subplots(figsize=(8.2, 4.6))
 
-bars = ax1.bar(labels, vals, color=colors_s, width=0.45, edgecolor="white")
-
-for bar, val in zip(bars, vals):
-    ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 25,
-             f"{int(val):,} cars\n~${val * REVENUE_PER_CAR / 1000:.0f}k revenue",
-             ha="center", fontweight="bold", fontsize=9)
+bars = ax.bar(labels, vals, color=colors_s, width=0.48, edgecolor="white")
 
 baseline = vals[0]
-for bar, val in zip(bars[1:], vals[1:]):
-    diff     = val - baseline
-    rev_diff = diff * REVENUE_PER_CAR
-    ax1.annotate(f"+{int(diff):,} cars vs current\n+${rev_diff:,.0f}/yr",
-                 xy=(bar.get_x() + bar.get_width() / 2, val + 200),
-                 ha="center", fontsize=9, color="#e76f51", fontweight="bold")
 
-ax1.set_title("Projected Annual Output by Scheduling Strategy",
-              fontweight="bold", fontsize=12)
-ax1.set_ylabel("Estimated Cars Fixed Per Year")
-ax1.set_ylim(0, max(vals) * 1.22)
-ax1.spines[["top", "right"]].set_visible(False)
+for i, (bar, val) in enumerate(zip(bars, vals)):
+    if i == 0:
+        label = f"{int(val):,} cars\nbaseline"
+    else:
+        diff = val - baseline
+        label = f"{int(val):,} cars\n+{int(diff)} vs current"
 
-bottom      = np.zeros(3)
-shop_colors = ["#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"]
+    ax.text(
+        bar.get_x() + bar.get_width() / 2,
+        bar.get_height() + 45,
+        label,
+        ha="center",
+        fontweight="bold",
+        fontsize=9
+    )
 
-for j, shop in enumerate(shops):
-    heights = [breakdowns[lbl][shop] for lbl in labels]
-    ax2.bar(labels, heights, bottom=bottom,
-            color=shop_colors[j], label=f"Shop {shop}",
-            edgecolor="white", width=0.45)
-    bottom += np.array(heights)
-
-ax2.set_title("Which Shop Contributes What\n(Stacked)", fontweight="bold", fontsize=12)
-ax2.set_ylabel("Cars Fixed Per Year")
-ax2.legend(loc="upper right", fontsize=8)
-ax2.spines[["top", "right"]].set_visible(False)
+ax.set_title("Projected Annual Output by Scheduling Strategy",
+             fontweight="bold", fontsize=12)
+ax.set_ylabel("Estimated Cars Fixed Per Year")
+ax.set_ylim(0, max(vals) * 1.13)
+ax.spines[["top", "right"]].set_visible(False)
 
 plt.tight_layout()
 plt.show()
@@ -348,10 +455,11 @@ Shifting visits toward the higher-impact shops adds more than **100 extra cars p
 
 ```{python}
 #| fig-cap: "Figure 4: The dot is the best estimate. The thick bar shows the realistic range at 95% confidence."
+#| out-width: "100%"
 
-fig, ax = plt.subplots(figsize=(9, 5))
+fig, ax = plt.subplots(figsize=(8.6, 4.8))
 
-lifts_mean    = []
+lifts_mean = []
 lifts_ci_vals = []
 
 for shop in shops:
@@ -359,25 +467,49 @@ for shop in shops:
     lifts_mean.append(mean_diff)
     lifts_ci_vals.append(ci)
 
-dot_colors = [C_BOSS if m >= 8 else (C_ACCENT if m >= 5 else C_NO) for m in lifts_mean]
+dot_colors = [
+    C_BOSS if m >= 8 else (C_ACCENT if m >= 5 else C_NO)
+    for m in lifts_mean
+]
 
 for i, (m, ci, col) in enumerate(zip(lifts_mean, lifts_ci_vals, dot_colors)):
-    ax.plot([m - ci, m + ci], [i, i],
-            color=col, linewidth=5, alpha=0.45, solid_capstyle="round")
-    ax.scatter(m, i, color=col, s=130, zorder=5,
-               edgecolors="white", linewidth=1.5)
-    ax.text(m + ci + 0.4, i,
-            f"Best guess: {m:+.1f}   (range: {m - ci:+.1f} to {m + ci:+.1f})",
-            va="center", fontsize=9, color="#264653")
+    ax.plot(
+        [m - ci, m + ci],
+        [i, i],
+        color=col,
+        linewidth=5,
+        alpha=0.45,
+        solid_capstyle="round"
+    )
+
+    ax.scatter(
+        m,
+        i,
+        color=col,
+        s=120,
+        zorder=5,
+        edgecolors="white",
+        linewidth=1.5
+    )
+
+    ax.text(
+        m + ci + 0.35,
+        i,
+        f"Best: {m:+.1f}  |  Range: {m - ci:+.1f} to {m + ci:+.1f}",
+        va="center",
+        fontsize=8.8,
+        color="#264653"
+    )
 
 ax.axvline(0, color="black", linewidth=1)
 ax.set_yticks(range(len(shops)))
-ax.set_yticklabels([f"Shop {s}" for s in shops], fontsize=11, fontweight="bold")
+ax.set_yticklabels([f"Shop {s}" for s in shops], fontsize=10.5, fontweight="bold")
 ax.set_xlabel("Extra Cars Fixed Per Day: Boss Present vs Not Present", fontsize=10)
 ax.set_title("Best Estimate vs Realistic Range for Each Shop",
              fontsize=12, fontweight="bold")
-ax.set_xlim(-3, max(lifts_mean) + 12)
+ax.set_xlim(-3, max(lifts_mean) + 11)
 ax.spines[["top", "right"]].set_visible(False)
+
 plt.tight_layout()
 plt.show()
 ```
@@ -397,42 +529,42 @@ The overall pattern is still useful. **Shops 4 and 2 show the clearest gap. Shop
 ## What Should Patrick Actually Do?
 
 ```{python}
-fig, ax = plt.subplots(figsize=(12, 3.8))
-ax.axis("off")
-
 action_data = [
-    ["Shop 4", f"+{lift[4]:.1f} cars/day", "Visit most often",
-     "Biggest gap in the data — highest return on his time"],
-    ["Shop 2", f"+{lift[2]:.1f} cars/day", "Regular weekly visits",
-     "Consistent boost, good sample of days to back it up"],
-    ["Shop 5", f"+{lift[5]:.1f} cars/day", "Check in regularly",
-     "High output shop that still gets a lift when he shows up"],
-    ["Shop 1", f"+{lift[1]:.1f} cars/day", "Visit occasionally",
-     "Smaller boost but still worth a stop now and then"],
-    ["Shop 3", f"+{lift[3]:.1f} cars/day", "Visit less for productivity",
-     "Runs well on its own — go for family, not for the numbers"],
+    {
+        "Shop": "Shop 4",
+        "Boss Effect": f"+{lift[4]:.1f}",
+        "Suggested Frequency": "Visit most often",
+        "Reason": "Biggest return"
+    },
+    {
+        "Shop": "Shop 2",
+        "Boss Effect": f"+{lift[2]:.1f}",
+        "Suggested Frequency": "Weekly visits",
+        "Reason": "Strong boost"
+    },
+    {
+        "Shop": "Shop 5",
+        "Boss Effect": f"+{lift[5]:.1f}",
+        "Suggested Frequency": "Regular check-ins",
+        "Reason": "Still adds value"
+    },
+    {
+        "Shop": "Shop 1",
+        "Boss Effect": f"+{lift[1]:.1f}",
+        "Suggested Frequency": "Occasional visits",
+        "Reason": "Useful boost"
+    },
+    {
+        "Shop": "Shop 3",
+        "Boss Effect": f"+{lift[3]:.1f}",
+        "Suggested Frequency": "Low priority",
+        "Reason": "Runs well without him"
+    }
 ]
 
-col_labels = ["Shop", "Boss Effect", "Suggested Frequency", "Reasoning"]
-
-tbl_obj = ax.table(cellText=action_data, colLabels=col_labels,
-                   cellLoc="center", loc="center", bbox=[0, 0, 1, 1])
-tbl_obj.auto_set_font_size(False)
-tbl_obj.set_fontsize(9.5)
-
-for j in range(4):
-    tbl_obj[(0, j)].set_facecolor("#264653")
-    tbl_obj[(0, j)].set_text_props(color="white", fontweight="bold")
-
-row_colors = ["#fff3e0", "#fff3e0", "#fffde7", "#fffde7", "#e8f5e9"]
-for i, color in enumerate(row_colors, 1):
-    for j in range(4):
-        tbl_obj[(i, j)].set_facecolor(color)
-
-ax.set_title("Recommended Schedule Based on the Data",
-             fontsize=13, fontweight="bold", pad=15)
-plt.tight_layout()
-plt.show()
+action_df = pd.DataFrame(action_data)
+action_df.index = [""] * len(action_df)
+action_df
 ```
 
 ---
@@ -441,7 +573,7 @@ plt.show()
 
 The data points toward a pretty clear answer. **Shops 4 and 2 respond the most to Patrick being there.** Shop 3 barely moves either way — his brother's team handles things well without him.
 
-Smarter scheduling does not mean working more days. It just means choosing better where to show up. Based on this dataset, that shift alone could add over **100 cars and $15,000+ in revenue per year** across the network.
+Smarter scheduling does not mean working more days. It just means choosing better where to show up. Based on this dataset, that shift alone could add over **100 cars and \$15,000+ in revenue per year** across the network.
 
 One thing worth doing: **keep tracking.** Another few months of data — especially more days with Patrick present at Shop 4 — would make these estimates much more reliable.
 
